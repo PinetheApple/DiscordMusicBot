@@ -9,5 +9,7 @@ async def on_ready():
 @bot.command()
 async def hello(ctx):
     await ctx.send("Hello!")
-bot.run('P_BOT')
+ Token = getenv('P_BOT')
+    keep_alive()
+    Client().run(Token, reconnect=True)
 
