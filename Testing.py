@@ -9,5 +9,5 @@ async def on_ready():
 @bot.command()
 async def hello(ctx):
     await ctx.send("Hello!")
-bot.run('P_Bot')
+bot.run('P_BOT')
 
