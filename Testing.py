@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from os import getenv
 
 import asyncio
 bot = commands.Bot(command_prefix='p!')
