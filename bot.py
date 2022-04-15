@@ -13,4 +13,4 @@ for i in range(len(cogs)):
 async def on_ready():
   print("Logged in as {0.user}".format(client))
 
-client.run("NzgzMTkyMzAwOTA4OTcwMDE2.X8XKqw.YACEtFM39dsJXLQj_V5gR-IjsL8")
+client.run("token")
