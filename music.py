@@ -1,39 +1,53 @@
 import discord
 from discord.ext import commands
 import youtube_dl
+from requests import get
 
 class music(commands.Cog):
     def _init_(self,client):
         self.client=client
 
-    @commands.command()
+    def search(arg,YDL_OPTIONS):
+        with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
+            try:
+                get(arg) 
+            except:
+                video = ydl.extract_info(f"ytsearch:{arg}", download=False)['entries'][0]
+            else:
+                video = ydl.extract_info(arg, download=False)
+
+        return video
+
+    @commands.command(aliases=['j'])
     async def join(self,ctx):
         if ctx.author.voice is None:
             await ctx.send("Please join a voice channel before using this command.")
-        v_c = ctx.author.voice.channel
+            return
+        vc = ctx.author.voice.channel
         if ctx.voice_client is None:
-            await v_c.connect()
+            await vc.connect()
         else:
-            await ctx.voice_client.move_to(v_c)
+            await ctx.voice_client.move_to(vc)
 
-    @commands.command()
-    async def disconnect(self,ctx):
+    @commands.command(aliases=['dc', 'disconnect'])
+    async def leave(self,ctx):
         await ctx.voice_client.disconnect()
 
     @commands.command()
     async def play(self,ctx,url):
         ctx.voice_client.stop()
-        FFMPEG_OPTIONS={"before_options": "reconnect 1 -reconnect_steamed 1 -reconnect_delay_max 5","options":"-vn"}
+        FFMPEG_OPTIONS={"options":"-vn"}
         YDL_OPTIONS={'format':"bestaudio"}
         vc = ctx.voice_client
 
         with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
-            info=ydl.extract_info(url,download=False)
-            url2= info['format'][0]['url']
+            info=music.search(url,YDL_OPTIONS)
+            url2= info['formats'][0]['url']
             source= await discord.FFmpegOpusAudio.from_probe(url2,**FFMPEG_OPTIONS)
             vc.play(source)
+            await ctx
 
-    @commands.command()
+    @commands.command(aliases=['stop'])
     async def pause(self,ctx):
         await ctx.voice_client.pause()
         await ctx.send("Paused.")
