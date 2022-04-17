@@ -1,6 +1,6 @@
 from http import client
-import discord
-from discord.ext import commands
+import disnake
+from disnake.ext import commands
 import youtube_dl
 from requests import get
 import asyncio
