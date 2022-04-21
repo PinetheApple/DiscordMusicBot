@@ -132,18 +132,38 @@ class MusicPlayer:
     When the bot disconnects from the Voice it's instance will be destroyed.
     """
 
-    __slots__ = ('bot', '_guild', '_ctxs', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume', 'buttons', 'music', 'music_controller', 'restmode')
+    __slots__ = ('bot', '_guild', '_ctxs', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume','buttons','view', 'music', 'music_controller', 'restmode')
 
     def __init__(self, ctx):
 
-        self.buttons = {'⏯': 'rp',
+        b1=Button(label="Resume/Pause", emoji="⏯")
+        b2=Button(label="Skip", emoji="⏭")
+        b3=Button(label="Volume", emoji="➕")
+        b4=Button(label="Volume", emoji="➖")
+        b5=Button(label="Thumbnail", emoji="🖼")
+        b6=Button(label="Stop", style=ButtonStyle.danger, emoji="⏹")
+        b7=Button(label="Queue", emoji="ℹ")
+        b8=Button(label="Tutorial", emoji="❔")
+        view=View()
+        view.add_item(b1)
+        view.add_item(b2)
+        view.add_item(b3)
+        view.add_item(b4)
+        view.add_item(b5)
+        view.add_item(b6)
+        view.add_item(b7)
+        view.add_item(b8)
+
+        '''self.buttons = {'⏯': 'rp',
                         '⏭': 'skip',
                         '➕': 'vol_up',
                         '➖': 'vol_down',
                         '🖼': 'thumbnail',
                         '⏹': 'stop',
                         'ℹ': 'queue',
-                        '❔': 'tutorial'}
+                        '❔': 'tutorial'}'''
+
+        self.view=view
 
         self.bot = ctx.bot
         self._guild = ctx.guild
@@ -165,8 +185,8 @@ class MusicPlayer:
         vc = guild.voice_client
         vctwo = context.voice_client
 
-        for react in self.buttons:
-            await current.add_reaction(str(react))
+        '''for react in self.buttons:
+            await current.add_reaction(str(react))'''
 
         def check(r, u):
             if not current:
@@ -181,7 +201,7 @@ class MusicPlayer:
                 return False
             return True
 
-        while current:
+        '''while current:
             if vc is None:
                 return False
 
@@ -215,18 +235,18 @@ class MusicPlayer:
                 vctwo.source.volume -= 5
 
             if control == 'thumbnail':
-                await channel.send(embed=disnake.Embed(color=self.bot.color).set_image(url=source.thumbnail).set_footer(text=f"Requested by {source.requester} | Video: {source.title}", icon_url=source.requester.avatar_url), delete_after=10)
+                await channel.send(embed=Embed(color=self.bot.color).set_image(url=source.thumbnail).set_footer(text=f"Requested by {source.requester} | Video: {source.title}", icon_url=source.requester.avatar_url), delete_after=10)
 
             if control == 'tutorial':
-                await channel.send(embed=disnake.Embed(color=self.bot.color).add_field(name="How to use Music Controller?", value="⏯ - Resume or pause player\n⏭ - Skip song\n➕ - Volume up\n➖ - Volume down\n🖼 - Get song thumbnail\n⏹ - Stop music session\nℹ - Player queue\n❔ - Shows you how to use Music Controller"), delete_after=10)
+                await channel.send(embed=Embed(color=self.bot.color).add_field(name="How to use Music Controller?", value="⏯ - Resume or pause player\n⏭ - Skip song\n➕ - Volume up\n➖ - Volume down\n🖼 - Get song thumbnail\n⏹ - Stop music session\nℹ - Player queue\n❔ - Shows you how to use Music Controller"), delete_after=10)
             
             if control == 'queue':
                 await self._cog.queue_info(context)
 
             try:
                 await current.remove_reaction(react, user)
-            except disnake.HTTPException:
-                pass
+            except HTTPException:
+                pass'''
 
     async def player_loop(self):
         """Our main player loop."""
@@ -257,14 +277,14 @@ class MusicPlayer:
                 self._guild.voice_client.play(source, after=lambda _: self.bot.loop.call_soon_threadsafe(self.next.set))
             except Exception:
                 continue
-            embednps = disnake.Embed(color=self.bot.color)
+            embednps = Embed(color=self.bot.color)
             embednps.add_field(name="Song title:", value=f"```fix\n{source.title}```", inline=False)
             embednps.add_field(name="Requested by:", value=f"**{source.requester}**", inline=True)
             embednps.add_field(name="Song URL:", value=f"**[URL]({source.web_url})**", inline=True)
             embednps.add_field(name="Uploader:", value=f"**{source.uploader}**", inline=True)
             embednps.add_field(name="Song duration:", value=f"**{datetime.timedelta(seconds=source.duration)}**", inline=True)
             embednps.set_thumbnail(url=f"{source.thumbnail}")
-            self.np = await self._channel.send(embed=embednps)
+            self.np = await self._channel.send(embed=embednps,view=self.view)
 
             self.music_controller = self.bot.loop.create_task(self.buttons_controller(self._guild, self.np, source, self._channel, self._ctxs))
             await self.next.wait()
@@ -310,23 +330,12 @@ class music(commands.Cog):
             raise commands.NoPrivateMessage
         return True
 
-    async def cleanup(self, guild):
-        try:
-            await guild.voice_client.disconnect()
-        except AttributeError:
-            pass
-
-        try:
-            del self.players[guild.id]
-        except KeyError:
-            pass
-
     async def __error(self, ctx, error):
         """A local error handler for all errors arising from commands in this cog."""
         if isinstance(error, commands.NoPrivateMessage):
             try:
                 return await ctx.send(':notes: This command can not be used in Private Messages.')
-            except disnake.HTTPException:
+            except HTTPException:
                 pass
         elif isinstance(error, InvalidVoiceChannel):
             await ctx.send(":notes: Please join voice channel or specify one with command!")
@@ -345,7 +354,7 @@ class music(commands.Cog):
         return player
 
     @commands.command(name='connect', aliases=['join', 'j'])
-    async def connect_(self, ctx, *, channel: disnake.VoiceChannel=None):
+    async def connect_(self, ctx, *, channel: VoiceChannel=None):
         """Connect to voice.
 
         Parameters
@@ -408,6 +417,15 @@ class music(commands.Cog):
         source = await YTDLSource.create_source(ctx, search, loop=self.bot.loop, download=False)
         await player.queue.put(source)
 
+    @commands.command(aliases=['dc','stop','disconnect'])
+    async def leave(self, ctx):
+        await ctx.channel.send('**:notes: Ok, goodbye!**', delete_after=5)
+        try:
+            await self.cleanup(ctx.guild)
+        except:
+            print("not work :(")
+
+
     @commands.command(name='now_playing', aliases=['np', 'current', 'currentsong', 'playing'])
     async def now_playing_(self, ctx):
         """Display information about the currently playing song."""
@@ -427,17 +445,17 @@ class music(commands.Cog):
         try:
             # Remove our previous now_playing message.
             await player.np.delete()
-        except disnake.HTTPException:
+        except HTTPException:
             pass
 
-        embednp = disnake.Embed(color=self.bot.color)
+        embednp = Embed(color=self.bot.color)
         embednp.add_field(name="Song title:", value=f"```fix\n{vc.source.title}```", inline=False)
         embednp.add_field(name="Requested by:", value=f"**{vc.source.requester}**", inline=True)
         embednp.add_field(name="Song URL:", value=f"**[URL]({vc.source.web_url})**", inline=True)
         embednp.add_field(name="Uploader:", value=f"**{vc.source.uploader}**", inline=True)
         embednp.add_field(name="Song duration:", value=f"**{datetime.timedelta(seconds=vc.source.duration)}**", inline=True)
         embednp.set_thumbnail(url=f"{vc.source.thumbnail}")
-        player.np = await ctx.send(embed=embednp)
+        player.np = await ctx.send(embed=embednp,view=self.view)
         self.music_controller = self.bot.loop.create_task(MusicPlayer(ctx).buttons_controller(ctx.guild, player.np, vc.source, ctx.channel, ctx))
 
     async def queue_info(self, ctx):
@@ -448,7 +466,7 @@ class music(commands.Cog):
         upcoming = list(itertools.islice(player.queue._queue, 0, 5))
 
         fmt = '\n'.join(f'**`{_["title"]}`**' for _ in upcoming)
-        embed = disnake.Embed(title=f'Queue - Next {len(upcoming)}', description=fmt, color=self.bot.color)
+        embed = Embed(title=f'Queue - Next {len(upcoming)}', description=fmt, color=self.bot.color)
         await ctx.send(embed=embed)
 
 def setup(bot):
