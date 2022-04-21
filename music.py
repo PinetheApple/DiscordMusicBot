@@ -9,6 +9,7 @@ from functools import partial
 from youtube_dl import YoutubeDL
 from disnake.ext.commands.cooldowns import BucketType
 from disnake.ui import Button, View
+from disnake import PCMVolumeTransformer, FFmpegPCMAudio, Embed, HTTPException, VoiceChannel, ButtonStyle
 
 #\:emoji:
 '''button=Button(label="anything",style=discord.ButtonStyle.green(or danger, link or grey(default)), emoji="<:emoji:328747327847>", url/link:"link.com")
