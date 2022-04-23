@@ -77,13 +77,13 @@ class musicView(View):
     @disnake.ui.button(label="Volume",style=ButtonStyle.blurple, emoji="➕")
     async def b4_callback(self, button, interaction):
         player = self.musicplayer._cog.get_player(self.context)
-        self.context.voice_client.source.volume += 1
+        self.context.voice_client.source.volume += 0.1
         await interaction.response.send_message("Volume increased!",delete_after=10)
 
     @disnake.ui.button(label="Volume", style=ButtonStyle.blurple, emoji="➖")
     async def b5_callback(self, button, interaction):
         player = self.musicplayer._cog.get_player(self.context)
-        self.context.voice_client.source.volume -= 1
+        self.context.voice_client.source.volume -= 0.1
         await interaction.response.send_message("Volume decreased!",delete_after=10)
 
     @disnake.ui.button(label="Thumbnail",style=ButtonStyle.blurple, emoji="🖼")
