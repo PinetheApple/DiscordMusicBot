@@ -11,18 +11,6 @@ from disnake.ext.commands.cooldowns import BucketType
 from disnake.ui import Button, View
 from disnake import PCMVolumeTransformer, FFmpegPCMAudio, Embed, HTTPException, VoiceChannel, ButtonStyle
 
-#\:emoji:
-'''button=Button(label="anything",style=discord.ButtonStyle.green(or danger, link or grey(default)), emoji="<:emoji:328747327847>", url/link:"link.com")
-view=View()
-view.add_item(button)
-ctx.send("e", view)
-
-async def b_callback(interaction):
-    await interaction.response.send_message("reply")
-
-button.callback=b_callback
-'''
-
 ytdlopts = {
     'format': 'bestaudio/best',
     'outtmpl': 'downloads/%(extractor)s-%(id)s-%(title)s.%(ext)s',
@@ -47,13 +35,77 @@ ytdl = YoutubeDL(ytdlopts)
 
 class VoiceConnectionError(commands.CommandError):
     """Custom Exception class for connection errors."""
+    def __init__(self, msg):
+        self.msg=msg
 
 
 class InvalidVoiceChannel(VoiceConnectionError):
     """Exception for cases of invalid Voice Channels."""
+    def __init__(self, msg):
+        self.msg=msg
 
+class musicView(View):
+    def __init__(self, musicplayer):
+        super().__init__()
+        self.vc=musicplayer._guild.voice_client
+        self.musicplayer=musicplayer
+        self.context=musicplayer._ctxs
+        self.channel=musicplayer._channel
 
-class YTDLSource(disnake.PCMVolumeTransformer):
+    @disnake.ui.button(label="Pause", style=ButtonStyle.blurple, emoji="⏸️")
+    async def b1_callback(self, button, interaction):
+        if(self.vc.is_paused()):
+            await interaction.response.send_message("No music is playing!", ephemeral=True)
+            return
+        else: 
+            self.vc.pause()
+            await interaction.response.send_message("Music paused!")
+    
+    @disnake.ui.button(label="Play", style=ButtonStyle.blurple, emoji="▶️")
+    async def b2_callback(self, button, interaction):
+        if(self.vc.is_playing()):
+            await interaction.response.send_message("Already playing!", ephemeral=True)
+            return
+        else: 
+            self.vc.resume()
+            await interaction.response.send_message("Music resumed!")
+
+    @disnake.ui.button(label="Skip", style=ButtonStyle.blurple, emoji="⏭️")
+    async def b3_callback(self, button, interaction):
+        self.vc.stop()
+
+    @disnake.ui.button(label="Volume",style=ButtonStyle.blurple, emoji="➕")
+    async def b4_callback(self, button, interaction):
+        player = self.musicplayer._cog.get_player(self.context)
+        self.context.voice_client.source.volume += 1
+        await interaction.response.send_message("Volume increased!",delete_after=10)
+
+    @disnake.ui.button(label="Volume", style=ButtonStyle.blurple, emoji="➖")
+    async def b5_callback(self, button, interaction):
+        player = self.musicplayer._cog.get_player(self.context)
+        self.context.voice_client.source.volume -= 1
+        await interaction.response.send_message("Volume decreased!",delete_after=10)
+
+    @disnake.ui.button(label="Thumbnail",style=ButtonStyle.blurple, emoji="🖼")
+    async def b6_callback(self, button, interaction):
+        await interaction.response.send_message(embed=Embed(color=self.musicplayer.bot.color).set_image(url=self.vc.source.thumbnail).set_footer(text=f"Requested by {self.vc.source.requester} | Video: {self.vc.source.title}"), delete_after=20)
+
+    @disnake.ui.button(label="Stop", style=ButtonStyle.danger, emoji="⏹️")
+    async def b7_callback(self, button, interaction):
+        await self.channel.send('**:notes: Ok, goodbye!**', delete_after=5)
+        await self.musicplayer._cog.cleanup(self.musicplayer._guild)
+    
+    @disnake.ui.button(label="Queue", emoji="ℹ️")
+    async def b8_callback(self, button, interaction):
+        await self.musicplayer._cog.queue_info(self.context)
+        
+    async def interaction_check(self, interaction) -> bool:
+        if interaction.author not in self.vc.channel.members:
+            await interaction.response.send_message("You can't use this button!", ephemeral=True)
+            return False
+        else: return True
+
+class YTDLSource(PCMVolumeTransformer):
 
     def __init__(self, source, *, data, requester):
         super().__init__(source)
@@ -85,7 +137,6 @@ class YTDLSource(disnake.PCMVolumeTransformer):
 
     def __getitem__(self, item: str):
         """Allows us to access attributes similar to a dict.
-
         This is only useful when you are NOT downloading.
         """
         return self.__getattribute__(item)
@@ -108,12 +159,11 @@ class YTDLSource(disnake.PCMVolumeTransformer):
         else:
             return {'webpage_url': data['webpage_url'], 'requester': ctx.author, 'title': data['title']}
 
-        return cls(disnake.FFmpegPCMAudio(source), data=data, requester=ctx.author)
+        return cls(FFmpegPCMAudio(source), data=data, requester=ctx.author)
 
     @classmethod
     async def regather_stream(cls, data, *, loop):
         """Used for preparing a stream, instead of downloading.
-
         Since Youtube Streaming links expire."""
         loop = loop or asyncio.get_event_loop()
         requester = data['requester']
@@ -121,39 +171,19 @@ class YTDLSource(disnake.PCMVolumeTransformer):
         to_run = partial(ytdl.extract_info, url=data['webpage_url'], download=False)
         data = await loop.run_in_executor(None, to_run)
 
-        return cls(disnake.FFmpegPCMAudio(data['url']), data=data, requester=requester)
+        return cls(FFmpegPCMAudio(data['url']), data=data, requester=requester)
 
 
 class MusicPlayer:
     """A class which is assigned to each guild using the bot for Music.
-
     This class implements a queue and loop, which allows for different guilds to listen to different playlists
     simultaneously.
-
     When the bot disconnects from the Voice it's instance will be destroyed.
     """
 
     __slots__ = ('bot', '_guild', '_ctxs', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume','buttons','view', 'music', 'music_controller', 'restmode')
 
     def __init__(self, ctx):
-
-        b1=Button(label="Resume/Pause", emoji="⏯")
-        b2=Button(label="Skip", emoji="⏭")
-        b3=Button(label="Volume", emoji="➕")
-        b4=Button(label="Volume", emoji="➖")
-        b5=Button(label="Thumbnail", emoji="🖼")
-        b6=Button(label="Stop", style=ButtonStyle.danger, emoji="⏹")
-        b7=Button(label="Queue", emoji="ℹ")
-        b8=Button(label="Tutorial", emoji="❔")
-        view=View()
-        view.add_item(b1)
-        view.add_item(b2)
-        view.add_item(b3)
-        view.add_item(b4)
-        view.add_item(b5)
-        view.add_item(b6)
-        view.add_item(b7)
-        view.add_item(b8)
 
         '''self.buttons = {'⏯': 'rp',
                         '⏭': 'skip',
@@ -163,8 +193,6 @@ class MusicPlayer:
                         '⏹': 'stop',
                         'ℹ': 'queue',
                         '❔': 'tutorial'}'''
-
-        self.view=view
 
         self.bot = ctx.bot
         self._guild = ctx.guild
@@ -180,74 +208,9 @@ class MusicPlayer:
         self.current = None
         self.music_controller = None
 
+        self.view=musicView(self)
+
         ctx.bot.loop.create_task(self.player_loop())
-
-    async def buttons_controller(self, guild, current, source, channel, context):
-        vc = guild.voice_client
-        vctwo = context.voice_client
-
-        '''for react in self.buttons:
-            await current.add_reaction(str(react))'''
-
-        def check(r, u):
-            if not current:
-                return False
-            elif str(r) not in self.buttons.keys():
-                return False
-            elif u.id == self.bot.user.id or r.message.id != current.id:
-                return False
-            elif u not in vc.channel.members:
-                return False
-            elif u.bot:
-                return False
-            return True
-
-        '''while current:
-            if vc is None:
-                return False
-
-            react, user = await self.bot.wait_for('reaction_add', check=check)
-            control = self.buttons.get(str(react))
-
-            if control == 'rp':
-                if vc.is_paused():
-                    vc.resume()
-                else:
-                    vc.pause()
-
-            if control == 'skip':
-                vc.stop()
-
-            if control == 'stop':
-                await channel.send('**:notes: Ok, goodbye!**', delete_after=5)
-                await self._cog.cleanup(guild)
-
-                try:
-                    self.music_controller.cancel()
-                except:
-                    pass
-
-            if control == 'vol_up':
-                player = self._cog.get_player(context)
-                vctwo.source.volume += 5
-                        
-            if control == 'vol_down':
-                player = self._cog.get_player(context)
-                vctwo.source.volume -= 5
-
-            if control == 'thumbnail':
-                await channel.send(embed=Embed(color=self.bot.color).set_image(url=source.thumbnail).set_footer(text=f"Requested by {source.requester} | Video: {source.title}", icon_url=source.requester.avatar_url), delete_after=10)
-
-            if control == 'tutorial':
-                await channel.send(embed=Embed(color=self.bot.color).add_field(name="How to use Music Controller?", value="⏯ - Resume or pause player\n⏭ - Skip song\n➕ - Volume up\n➖ - Volume down\n🖼 - Get song thumbnail\n⏹ - Stop music session\nℹ - Player queue\n❔ - Shows you how to use Music Controller"), delete_after=10)
-            
-            if control == 'queue':
-                await self._cog.queue_info(context)
-
-            try:
-                await current.remove_reaction(react, user)
-            except HTTPException:
-                pass'''
 
     async def player_loop(self):
         """Our main player loop."""
@@ -268,8 +231,7 @@ class MusicPlayer:
                 try:
                     source = await YTDLSource.regather_stream(source, loop=self.bot.loop)
                 except Exception as e:
-                    await self._channel.send(f':notes: There was an error processing your song.\n'
-                                             f'```css\n[{e}]\n```')
+                    await self._channel.send(':notes: There was an error processing your song.\n')
                     continue
 
             source.volume = self.volume
@@ -287,7 +249,6 @@ class MusicPlayer:
             embednps.set_thumbnail(url=f"{source.thumbnail}")
             self.np = await self._channel.send(embed=embednps,view=self.view)
 
-            self.music_controller = self.bot.loop.create_task(self.buttons_controller(self._guild, self.np, source, self._channel, self._ctxs))
             await self.next.wait()
 
             # Make sure the FFmpeg process is cleaned up.
@@ -297,7 +258,6 @@ class MusicPlayer:
             try:
                 # We are no longer playing this song...
                 await self.np.delete()
-                self.music_controller.cancel()
             except Exception:
                 pass
 
@@ -308,7 +268,7 @@ class MusicPlayer:
 class music(commands.Cog):
     """Music related commands."""
 
-    __slots__ = ('bot', 'players', 'musictwo', 'music_controller')
+    __slots__ = ('bot', 'players', 'musictwo')
 
     def __init__(self, bot):
         self.bot = bot
@@ -357,13 +317,11 @@ class music(commands.Cog):
     @commands.command(name='connect', aliases=['join', 'j'])
     async def connect_(self, ctx, *, channel: VoiceChannel=None):
         """Connect to voice.
-
         Parameters
         ------------
         channel: discord.VoiceChannel [Optional]
             The channel to connect to. If a channel is not specified, an attempt to join the voice channel you are in
             will be made.
-
         This command also handles moving the bot to different channels.
         """
         if not channel:
@@ -392,10 +350,8 @@ class music(commands.Cog):
     @commands.command(name='play', aliases=['sing', 'p'])
     async def play_(self, ctx, *, search: str):
         """Request a song and add it to the queue.
-
         This command attempts to join a valid voice channel if the bot is not already in one.
         Uses YTDL to automatically search and retrieve a song.
-
         Parameters
         ------------
         search: str [Required]
@@ -457,7 +413,7 @@ class music(commands.Cog):
         embednp.add_field(name="Song duration:", value=f"**{datetime.timedelta(seconds=vc.source.duration)}**", inline=True)
         embednp.set_thumbnail(url=f"{vc.source.thumbnail}")
         player.np = await ctx.send(embed=embednp,view=self.view)
-        self.music_controller = self.bot.loop.create_task(MusicPlayer(ctx).buttons_controller(ctx.guild, player.np, vc.source, ctx.channel, ctx))
+        #self.music_controller = self.bot.loop.create_task(MusicPlayer(ctx).buttons_controller(ctx.guild, player.np, vc.source, ctx.channel, ctx))
 
     async def queue_info(self, ctx):
         player = self.get_player(ctx)
