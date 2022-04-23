@@ -26,4 +26,4 @@ async def ping(ctx):
     diff = resp.created_at - ctx.message.created_at
     await resp.edit(content=f':ping_pong: Pong! **API** latency: {1000*diff.total_seconds():.1f}ms. **{bot.user.name}** latency: {round(bot.latency * 1000)}ms')
 
-client.run("token")
+bot.run("token")
