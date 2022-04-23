@@ -181,18 +181,9 @@ class MusicPlayer:
     When the bot disconnects from the Voice it's instance will be destroyed.
     """
 
-    __slots__ = ('bot', '_guild', '_ctxs', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume','buttons','view', 'music', 'music_controller', 'restmode')
+    __slots__ = ('bot', '_guild', '_ctxs', '_channel', '_cog', 'queue', 'next', 'current', 'np', 'volume','view', 'music', 'music_controller', 'restmode')
 
     def __init__(self, ctx):
-
-        '''self.buttons = {'⏯': 'rp',
-                        '⏭': 'skip',
-                        '➕': 'vol_up',
-                        '➖': 'vol_down',
-                        '🖼': 'thumbnail',
-                        '⏹': 'stop',
-                        'ℹ': 'queue',
-                        '❔': 'tutorial'}'''
 
         self.bot = ctx.bot
         self._guild = ctx.guild
