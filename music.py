@@ -59,7 +59,7 @@ class musicView(View):
             return
         else: 
             self.vc.pause()
-            await interaction.response.send_message("Music paused!")
+            await interaction.response.send_message("Music paused!",delete_after=10)
     
     @disnake.ui.button(label="Play", style=ButtonStyle.blurple, emoji="▶️")
     async def b2_callback(self, button, interaction):
@@ -68,23 +68,24 @@ class musicView(View):
             return
         else: 
             self.vc.resume()
-            await interaction.response.send_message("Music resumed!")
+            await interaction.response.send_message("Music resumed!",delete_after=10)
 
     @disnake.ui.button(label="Skip", style=ButtonStyle.blurple, emoji="⏭️")
     async def b3_callback(self, button, interaction):
         self.vc.stop()
+        await interaction.response.send_message("Song skipped!",delete_after=10)
 
     @disnake.ui.button(label="Volume",style=ButtonStyle.blurple, emoji="➕")
     async def b4_callback(self, button, interaction):
         player = self.musicplayer._cog.get_player(self.context)
         self.context.voice_client.source.volume += 0.1
-        await interaction.response.send_message("Volume increased!",delete_after=10)
+        await interaction.response.send_message("Volume increased!",delete_after=5)
 
     @disnake.ui.button(label="Volume", style=ButtonStyle.blurple, emoji="➖")
     async def b5_callback(self, button, interaction):
         player = self.musicplayer._cog.get_player(self.context)
         self.context.voice_client.source.volume -= 0.1
-        await interaction.response.send_message("Volume decreased!",delete_after=10)
+        await interaction.response.send_message("Volume decreased!",delete_after=5)
 
     @disnake.ui.button(label="Thumbnail",style=ButtonStyle.blurple, emoji="🖼")
     async def b6_callback(self, button, interaction):
@@ -230,7 +231,7 @@ class MusicPlayer:
             try:
                 self._guild.voice_client.play(source, after=lambda _: self.bot.loop.call_soon_threadsafe(self.next.set))
             except Exception:
-                continue
+                await self._channel.send(':notes: There was an error processing your song.\n')
             embednps = Embed(color=self.bot.color)
             embednps.add_field(name="Song title:", value=f"```fix\n{source.title}```", inline=False)
             embednps.add_field(name="Requested by:", value=f"**{source.requester}**", inline=True)
@@ -371,8 +372,7 @@ class music(commands.Cog):
         try:
             await self.cleanup(ctx.guild)
         except:
-            print("not work :(")
-
+            print("no")
 
     @commands.command(name='now_playing', aliases=['np', 'current', 'currentsong', 'playing'])
     async def now_playing_(self, ctx):
@@ -403,8 +403,7 @@ class music(commands.Cog):
         embednp.add_field(name="Uploader:", value=f"**{vc.source.uploader}**", inline=True)
         embednp.add_field(name="Song duration:", value=f"**{datetime.timedelta(seconds=vc.source.duration)}**", inline=True)
         embednp.set_thumbnail(url=f"{vc.source.thumbnail}")
-        player.np = await ctx.send(embed=embednp,view=self.view)
-        #self.music_controller = self.bot.loop.create_task(MusicPlayer(ctx).buttons_controller(ctx.guild, player.np, vc.source, ctx.channel, ctx))
+        player.np = await ctx.send(embed=embednp,view=player.view)
 
     async def queue_info(self, ctx):
         player = self.get_player(ctx)
